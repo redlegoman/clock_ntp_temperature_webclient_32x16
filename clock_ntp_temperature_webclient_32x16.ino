@@ -1,4 +1,4 @@
-#include <ht1632c.h>
+#include "/Volumes/MacHDD/Dropbox/Dropbox/programming/arduino/clock_ntp_temperature_webclient_32x16/ht1632c_C.h"
 //#include <font_koi8.h>
 
 #include <SPI.h>
