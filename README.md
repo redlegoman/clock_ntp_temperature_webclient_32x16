@@ -1,7 +1,7 @@
 clock_ntp_temperature_webclient_32x16
 =====================================
-Mainly code stolen from other people. Displays a clock (set from ntp) and the temperature (information scraped from a
-web server).
+Displays a clock (set from ntp) and the temperature (information scraped from a web server).<br>
+Mainly code stolen from others:<br><br>
 
 List of sources (as up-to-date as I can remember):<br>
 http://clock.bonsignore.com/ - very nice alarm clock project - mine looks very familiar (I stole a lot)<br>
