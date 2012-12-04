@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "/Volumes/MacHDD/Dropbox/Dropbox/programming/arduino/clock_ntp_temperature_webclient_32x16/ht1632c_C.h"
+#include "./ht1632c_C.h"
 #include "Print.h"
-#include "/Volumes/MacHDD/Dropbox/Dropbox/programming/arduino/clock_ntp_temperature_webclient_32x16/font_b.h"
-#include "/Volumes/MacHDD/Dropbox/Dropbox/programming/arduino/clock_ntp_temperature_webclient_32x16/font_koi8.h"
+#include "./font_b.h"
+#include "./font_koi8.h"
 
 /* fast integer (1 uint8_t) modulus - returns n % d */
 
