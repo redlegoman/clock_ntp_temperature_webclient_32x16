@@ -9,4 +9,4 @@ http://code.google.com/p/ht1632c/ - the library which makes the LED matrix from 
 http://forums.parallax.com/showthread.php?128037-Sure-Electronics-new-32x16-bi-color-display-3216-RG<br>
 https://github.com/evanrich/Bluetooth-LED-Sign<br>
 http://arduino.cc/forum/index.php/topic,50326.0.html - this forum post is fascinating, and details the development<br>
-                                                       of the library for the LED matrix.<br>
+of the library for the LED matrix.<br>
