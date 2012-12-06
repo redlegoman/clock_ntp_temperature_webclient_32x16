@@ -14,17 +14,14 @@
 byte mac[] = { 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF }; 
 
 /* ******** NTP Server Settings ******** */
-//IPAddress timeServer(193,79,237,14);
 IPAddress timeServer(10,10,10,150);
 /* Set this to the offset (in seconds) to your local time
    This example is GMT - 6 */
 const long timeZoneOffset = -00L;  
-
-/* Syncs to NTP server every 15 seconds for testing, 
-   set to 1 hour or more to be reasonable */
-unsigned int ntpSyncTime = 600;         
-
-
+//sync NTP every ntpSyncTime seconds
+unsigned int ntpSyncTime = 3600;       
+// sync temperature from web site every tempSyncTIme seconds
+unsigned int tempSyncTime = 10;         
 /* ALTER THESE VARIABLES AT YOUR OWN RISK */
 // local port to listen for UDP packets
 unsigned int localPort = 8888;
@@ -38,12 +35,15 @@ EthernetUDP Udp;
 // with the IP address and port of the server 
 // that you want to connect to (port 80 is default for HTTP):
 EthernetClient client;
+
 // Keeps track of how long ago we updated the NTP server
 unsigned long ntpLastUpdate = 0;    
-// Check last time clock displayed (Not in Production)
-time_t prevDisplay = 0;             
+// Keeps track of how long ago the temperature was updated from the web server
+unsigned long tempLastUpdate = 0;    
 
-int TimeSet=0;
+// variable to tell us if the last NTP sync was successful or not
+int ntpUpdated=0;
+
 
 ht1632c ledMatrix = ht1632c(&PORTD, 7, 6, 4, 5, GEOM_32x16, 1);
 
@@ -58,41 +58,47 @@ String seconds = "00";
 char secs[3];
 //address of webserver
 IPAddress webserver(10,10,10,4);
-String location = "/arduino/temp.php?param=out HTTP/1.0";
 char inString[32]; // string for incoming serial data
 int stringPos = 0; // string index counter
 boolean startRead = false; // is reading?
 
 void setup() {
   Serial.begin(9600);
-    
+//  delay (5000);
+
+  //for(;;);
   ledMatrix.clear();
   ledMatrix.pwm(15);
-  ledMatrix.setfont(FONT_5x7);
-   // Ethernet shield and NTP setup
-   int i = 0;
-   int DHCP = 0;
-   DHCP = Ethernet.begin(mac);
-   //Try to get dhcp settings 30 times before giving up
-   while( DHCP == 0 && i < 30){
-     delay(1000);
-     DHCP = Ethernet.begin(mac);
-     i++;
-   }
-   if(!DHCP){
-    Serial.println("DHCP FAILED");
-    ledMatrix.hscrolltext(8,"DHCP FAILED ",RED, 10, 5, LEFT);
-     for(;;); //Infinite loop because DHCP Failed
-   }
-   Serial.println("DHCP Success");
-       ledMatrix.hscrolltext(8,"DHCP Success ",GREEN, 10, 1, LEFT);
-   //Try to get the date and time
-   int trys=0;
-   while(!getTimeAndDate() && trys<10) {
-     trys++;
-   }
+  ledMatrix.setfont(FONT_7x14B);
 
-// print your local IP address:
+  // Ethernet shield and NTP setup
+  int i = 0;
+  int DHCP = 0;
+  //      Serial.println("test1");  
+  DHCP = Ethernet.begin(mac);
+    //  Serial.println("test2");  
+  //Try to get dhcp settings 30 times before giving up
+  while( DHCP == 0 && i < 5){
+    delay(1000);
+    DHCP = Ethernet.begin(mac);
+    i++;
+  }
+  if(!DHCP){
+    Serial.println("DHCP FAILED");
+    ledMatrix.hscrolltext(0,"DHCP FAILED ",RED, 10, 5, LEFT);
+    //==========for(;;); //Infinite loop because DHCP Failed
+  }else{
+  Serial.println("DHCP Success");
+  ledMatrix.hscrolltext(0,"DHCP Success ",GREEN, 5, 1, LEFT);
+  }
+  
+  //Try to get the date and time
+  int trys=0;
+  while(!getTimeAndDate() && trys<10) {
+    trys++;
+  }
+
+  // print your local IP address:
   Serial.print("My IP address: ");
   for (byte thisByte = 0; thisByte < 4; thisByte++) {
     // print the value of each byte of the IP address:
@@ -101,6 +107,22 @@ void setup() {
   }
   Serial.println();
 
+  trys=0;
+  while(!getTimeAndDate() && trys<10){
+    trys++;
+  }
+  if(trys<10){
+    ntpUpdated=1;
+    Serial.println("setup :ntp server update success");
+    ledMatrix.hscrolltext(0,"ntp success ",GREEN, 5, 1, LEFT);
+  }else{
+    ntpUpdated=0;
+    Serial.println("setup:ntp server update failed");
+    ledMatrix.hscrolltext(0,"ntp server update failed ",RED, 10, 1, LEFT);
+  }
+  ledMatrix.clear();
+  ledMatrix.pwm(15);
+  ledMatrix.setfont(FONT_5x7);
 
 }
 
@@ -141,156 +163,101 @@ unsigned long sendNTPpacket(IPAddress& address)
   Udp.endPacket(); 
 }
 
-// Clock display of the time and date (Basic)
-void clockDisplay(){
-  int nothing=0;
-//  Serial.print(hour());
-//  printDigits(minute());
-//  printDigits(second());
-/*  Serial.print(" ");
-  Serial.print(day());
-  Serial.print(" ");
-  Serial.print(month());
-  Serial.print(" ");
-  Serial.print(year()); 
-  Serial.println(); 
-  */
-}
 
-// Utility function for clock display: prints preceding colon and leading 0
-void printDigits(int digits){
-  Serial.print(":");
-  if(digits < 10)
-    Serial.print('0');
-  Serial.print(digits);
-}
 //=========================================================================================================
 boolean touchActive = false;
- char dig[6]  = "01234";
-    char msg[10] = "012345678";
+char dig[6]  = "01234";
+char msg[10] = "012345678";
     
-    int nowHour12 = 0;
-    int nowHour24 = 0;
-    int nowMinute = 0;
-    int nowPM = 0;
-    
-    int dispHour12 = 0;
-    int dispHour24 = 0;
-    int dispMinute = 0;
-    int dispPM = 0;
-    // initialize colors    
-    int digit_color = GREEN;
-    int message_color = RED;
-    int ampm_color = GREEN;
-    // initialize array to hold [x, y, prior_x, prior_y] data for touch location
-    int dot[4] = {0,0,0,0}; 
-    String pageValue = "00.00";
+int nowHour12 = 0;
+int nowHour24 = 0;
+int nowMinute = 0;
+int nowPM = 0;
+   
+int dispHour12 = 0;
+int dispHour24 = 0;
+int dispMinute = 0;
+int dispPM = 0;
+// initialize colors    
+int digit_color = GREEN;
+int message_color = RED;
+int ampm_color = GREEN;
+// initialize array to hold [x, y, prior_x, prior_y] data for touch location
+int dot[4] = {0,0,0,0}; 
+String pageValue = "00.00";
 //===================================================== LOOP ==============================================
 
 void loop() {
   // if there are incoming bytes available 
   // from the server, read them and print them:  
-  pageValue = connectAndRead(); //connect to the server and read the output
 
-  //Serial.println(pageValue); //print out the findings.
-  
-  
-    // Update the time via NTP server as often as the time you set at the top
-    if(now()-ntpLastUpdate > ntpSyncTime) {
-      int trys=0;
-      while(!getTimeAndDate() && trys<10){
-        trys++;
-      }
-      if(trys<10){
-        Serial.println("ntp server update success");
-        ledMatrix.hscrolltext(8,"ntp server update success ",GREEN, 10, 1, LEFT);
-       }
-      else{
-        Serial.println("ntp server update failed");
-        ledMatrix.hscrolltext(8,"ntp server update failed ",RED, 10, 5, LEFT);
-      }
+  //Serial.println(pageValue);
+  if(now()-tempLastUpdate > tempSyncTime){
+    pageValue = connectAndRead();
+  }
+  // Update the time via NTP server as often as the time you set at the top
+  if(now()-ntpLastUpdate > ntpSyncTime) {
+    //pageValue = connectAndRead(); //connect to the server and read the output
+    int trys=0;
+    while(!getTimeAndDate() && trys<2){
+      trys++;
     }
-    
-    // Display the time if it has changed by more than a second.
-    if( now() != prevDisplay){
-      prevDisplay = now();
-      clockDisplay();  
-    }
-    
-    
-    
-
-  delay (1000);  
-  //ledMatrix.clear();  
-  
-  
-  
+  if(trys<2){
+    ntpUpdated=1;
+    Serial.println("ntp server update success");
+//        ledMatrix.hscrolltext(8,"ntp server update success ",GREEN, 10, 1, LEFT);
+  }else{
+    ntpUpdated=0;
+    Serial.println("ntp server update failed");
+  //      ledMatrix.hscrolltext(8,"ntp server update failed ",RED, 10, 5, LEFT);
+  }
+  }
   snprintf(tbuf,sizeof(tbuf), "%02d:%02d", hour(), minute() );
   thetime=tbuf;
   snprintf(secs,sizeof(secs), "%02d", second() );
   seconds=secs;
-  /*
-  ledMatrix.setfont(FONT_5x7);
-  thetime.toCharArray(tbuf,7);
-  byte len = strlen(time);
-  for (int i = 0; i < len; i++)
-     ledMatrix.putchar(6*i,  0, thetime[i], ORANGE);
-  ledMatrix.sendframe();
-  ledMatrix.setfont(FONT_5x7);
-  seconds.toCharArray(secs,4);
-  byte len2 = strlen(secs);
-  for (int i = 0; i < len2; i++)
-     ledMatrix.putchar(6*i,  8, seconds[i], RED);
-  ledMatrix.sendframe();
-  byte len3 = pageValue.length();
-  for (int i = 0; i < len3; i++)
-     ledMatrix.putchar((6*i)+10,  8, pageValue[i], GREEN);
-  ledMatrix.sendframe();
-  */
-    currentTime();
-    setStyle(dispHour24, dispMinute); // set color and brightness based on displayed time
-    drawScreen(dispHour12, dispMinute, dispPM, touchActive, msg); // draw the screen             
-    delay(100); // wait for 100ms
+ 
+  currentTime();
+  setStyle(dispHour24, dispMinute); // set color and brightness based on displayed time
+  drawScreen(dispHour12, dispMinute, dispPM, touchActive, msg); // draw the screen             
+  delay(100); // wait for 100ms
       
 }//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void currentTime () {
-      
-        // set global variables for current time 
-        nowHour24 = hour();
+  // set global variables for current time 
+  nowHour24 = hour();
         
-        if (nowHour24 > 12){
-          nowHour12 = nowHour24;
-        //  nowHour12 = nowHour24 - 12;
-          nowPM = 1;
-        }
-        else{
-          nowHour12 = nowHour24;
-          nowPM = 0;
-        }
+  if (nowHour24 > 12){
+    nowHour12 = nowHour24;
+    //  nowHour12 = nowHour24 - 12;
+    nowPM = 1;
+  }else{
+    nowHour12 = nowHour24;
+    nowPM = 0;
+  }
         
-        if (nowHour24 == 12) nowPM = 1;   
-        
-        nowMinute = minute();
-        
-        dispHour24 = nowHour24;
-        dispHour12 = nowHour12;
-        dispMinute = nowMinute;
-        dispPM = nowPM;
-    }
+  if (nowHour24 == 12) nowPM = 1;   
+  nowMinute = minute();
+       
+  dispHour24 = nowHour24;
+  dispHour12 = nowHour12;
+  dispMinute = nowMinute;
+  dispPM = nowPM;
+}
 
 void setStyle(int hour24, int minute) {
       
         // adjust the brightness based on the time of day
-        if (hour24 <= 5) ledMatrix.pwm(15); /// 1 12:00a to 5:59a minimum brightness
-        else if (hour24 <= 6) ledMatrix.pwm(15); //5 6:00a to 6:59a brighter
+        if (hour24 <= 5) ledMatrix.pwm(1); /// 1 12:00a to 5:59a minimum brightness
+        else if (hour24 <= 6) ledMatrix.pwm(5); //5 6:00a to 6:59a brighter
         else if (hour24 <= 19) ledMatrix.pwm(15); //15 7:00a to 7:59p max brightness
-        else if (hour24 <= 21) ledMatrix.pwm(15); //5 8:00p to 9:59p dimmer
-        else if (hour24 <= 24) ledMatrix.pwm(15); //1  10:00p to 11:59p minimum brightness
+        else if (hour24 <= 21) ledMatrix.pwm(5); //5 8:00p to 9:59p dimmer
+        else if (hour24 <= 24) ledMatrix.pwm(1); //1  10:00p to 11:59p minimum brightness
         
         // adjust the color based on the time of day
         if (hour24 <= 6) digit_color = GREEN; // 12:00a to 6:59a red digits
         else if (hour24 <= 19) digit_color = GREEN; // 7:00a to 7:59p green digits 
-        else if (hour24 <= 24) digit_color = GREEN; // 8:00p to 11:59p red digits
+        else if (hour24 <= 24) digit_color = RED; // 8:00p to 11:59p red digits
         
         // set am/pm color .. this should probably = digit_color if there is an alarm display active in message area
         //ampm_color = digit_color;
@@ -311,11 +278,12 @@ void drawScreen( int hour12, int minute, int pm, boolean msgState, char message[
         char buf[5];
         char ampm = 'A';
         char letter_m = 'M';
+
+
         
         dig[0] = '1'; // set flag for valid time
         
         // set the hours digits
-        
         itoa(hour12, buf, 10);
         if (hour12 < 10){
           dig[1] = '\0';
@@ -325,7 +293,6 @@ void drawScreen( int hour12, int minute, int pm, boolean msgState, char message[
           dig[1] = buf[0];
           dig[2] = buf[1];
         }
-        
         // set the minutes digits
         itoa(minute, buf, 10);
         if (minute < 10){
@@ -345,7 +312,7 @@ void drawScreen( int hour12, int minute, int pm, boolean msgState, char message[
         msg[8] = letter_m;                       
       
         // clear any prior touch dots
-        ledMatrix.plot(dot[2],dot[3],BLACK); // clear any prior touch dots
+        //ledMatrix.plot(dot[2],dot[3],BLACK); // clear any prior touch dots
         
         // clear the message area        
         ledMatrix.rect(0,11,22,15,BLACK);
@@ -353,31 +320,16 @@ void drawScreen( int hour12, int minute, int pm, boolean msgState, char message[
         ledMatrix.rect(2,9,20,13,BLACK);
         ledMatrix.rect(3,8,19,12,BLACK);
         
-        // fist digit of hour
-        //if (dig[1] == '1') ledMatrix.putchar(2,-2,'1',digit_color,6);
-        //else ledMatrix.putchar(2,-2,'1',BLACK,6); // erase the "1" if the hour is 1-9   
+//        ledMatrix.setfont(FONT_7x14B);
+        
         ledMatrix.putchar(2,-2,dig[1],digit_color,6); // first digit of hour
         ledMatrix.putchar(9,-2,dig[2],digit_color,6); // second digit of hour
         ledMatrix.plot(16,3,ORANGE); // hour:min colon, top
         ledMatrix.plot(16,6,ORANGE); // hour:min colon, bottom
-        ledMatrix.putchar(18,-2,dig[3],digit_color,7); // first digit of minute
-        ledMatrix.putchar(25,-2,dig[4],digit_color,7); // second digit of minute
+        ledMatrix.putchar(18,-2,dig[3],digit_color,6); // first digit of minute
+        ledMatrix.putchar(25,-2,dig[4],digit_color,6); // second digit of minute
 
-        // draw the characters of the message area if a message is active
-        // otherwise, black out the message area
-        ledMatrix.setfont(FONT_4x6);
-        if (msgState && msg[1] != '\0') ledMatrix.putchar(0,11,msg[1],message_color);
-        if (msgState && msg[2] != '\0') ledMatrix.putchar(4,11,msg[2],message_color);
-        if (msgState && msg[3] != '\0') ledMatrix.putchar(8,11,msg[3],message_color);
-        if (msgState && msg[4] != '\0') ledMatrix.putchar(12,11,msg[4],message_color);
-        if (msgState && msg[5] != '\0') ledMatrix.putchar(16,11,msg[5],message_color);
-        if (msgState && msg[6] != '\0') ledMatrix.putchar(20,11,msg[6],message_color);
 
-        // draw the AM or PM
-        //ledMatrix.setfont(FONT_4x6);
-        //ledMatrix.putchar(24,11,msg[7],ampm_color,6);
-        //ledMatrix.putchar(28,11,msg[8],ampm_color,6);
-                
 /* m                        
  mm#mm   mmm   mmmmm  mmmm  
    #    #"  #  # # #  #" "# 
@@ -387,28 +339,36 @@ void drawScreen( int hour12, int minute, int pm, boolean msgState, char message[
                       "                 */
         //temperature
         byte len3 = pageValue.length();
-        Serial.print("len3 = ");
-        Serial.println(len3);
+//        Serial.print("len3 = ");
+ //       Serial.println(len3);
         ledMatrix.setfont(FONT_5x7);
         if(len3 == 4){
-          ledMatrix.putchar(0,10,pageValue[0],ORANGE);
+          ledMatrix.putchar2(0,10,pageValue[0],ORANGE);
           ledMatrix.setfont(FONT_4x6);
-          ledMatrix.putchar(4,11,pageValue[1],ORANGE);
+          ledMatrix.putchar2(4,11,pageValue[1],ORANGE);
           ledMatrix.setfont(FONT_5x7);
-          ledMatrix.putchar(7,10,pageValue[2],ORANGE);
+          ledMatrix.putchar2(7,10,pageValue[2],ORANGE);
         }else{
-          ledMatrix.putchar(0,10,pageValue[0],ORANGE);
-          ledMatrix.putchar(5,10,pageValue[1],ORANGE);
+          ledMatrix.putchar2(0,10,pageValue[0],ORANGE);
+          ledMatrix.putchar2(5,10,pageValue[1],ORANGE);
           ledMatrix.setfont(FONT_4x6);
-          ledMatrix.putchar(9,11,pageValue[2],ORANGE);
+          ledMatrix.putchar2(9,11,pageValue[2],ORANGE);
           ledMatrix.setfont(FONT_5x7);
-          ledMatrix.putchar(11,10,pageValue[3],ORANGE);
+          ledMatrix.putchar2(11,10,pageValue[3],ORANGE);
         }
         
         ledMatrix.setfont(FONT_4x6);
         byte len2 = strlen(secs);
-        ledMatrix.putchar(25,11,secs[0],RED);
-        ledMatrix.putchar(29,11,secs[1],RED);
+        ledMatrix.putchar2(25,11,secs[0],RED);
+        ledMatrix.putchar2(29,11,secs[1],RED);
+                
+        // if ntp failed, draw a red dot in the upper left
+        if(ntpUpdated==0){
+          ledMatrix.plot(0,0,RED);
+        }else{
+          ledMatrix.plot(0,0,GREEN);
+        }  
+        
         
         // send the characters to the display, and draw the screen
         ledMatrix.sendframe();
@@ -419,20 +379,25 @@ void drawScreen( int hour12, int minute, int pm, boolean msgState, char message[
 String connectAndRead(){
   //connect to the server
 
-  Serial.println("connecting...");
+  Serial.println("connecting to web server...");
 
   if (client.connect(webserver, 80)) {
-    Serial.println("connected");
+    //Serial.println("connected");
     client.println("GET /arduino/temp.php?param=out HTTP/1.0");
 //    client.println("GET /arduino/temp.php?param=in HTTP/1.0");
 
     client.println();
 
     //Connected - Read the page
-    return readPage(); //go and read the output
+
+    tempLastUpdate = now();
+    String temp1 = readPage();
+    Serial.print(temp1);Serial.print("|");
+    return temp1; //go and read the output
 
   }else{
-    return "connection failed";
+    Serial.println("can't connect to webserver");
+    return "00.00";
   }
 
 }

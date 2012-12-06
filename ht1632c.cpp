@@ -393,7 +393,39 @@ uint8_t ht1632c::putchar(int x, int y, char c, uint8_t color, uint8_t attr, uint
   }
   return ++width;
 }
+/* print a single character */
 
+uint8_t ht1632c::putchar2(int x, int y, char c, uint8_t color, uint8_t attr, uint8_t bgcolor)
+{
+  uint16_t dots, msb;
+  char col, row;
+
+  uint8_t width = font_width;
+  uint8_t height = font_height;
+
+  if (x < -width || x > x_max + width || y < -height || y > y_max + height)
+    return 0;
+
+  if ((unsigned char) c >= 0xc0) c -= 0x41;
+  c -= 0x20;
+  msb = 1 << (height - 1);
+
+  // some math with pointers... don't try this at home ;-)
+  prog_uint8_t *addr = font + c * width;
+  prog_uint16_t *waddr = wfont + c * width;
+
+  for (col = 0; col < width; col++) {
+    dots = (height > 8) ? pgm_read_word_near(waddr + col) : pgm_read_byte_near(addr + col);
+    for (row = 0; row < height-1; row++) {
+      if (dots & (msb >> row)) {
+        plot(x + col, y + row, (color & MULTICOLOR) ? _rnd(1, 4) : color);
+      } else {
+        plot(x + col, y + row, bgcolor);
+      }
+    }
+  }
+  return ++width;
+}
 /* put a bitmap in the coordinates x, y */
 
 void ht1632c::putbitmap(int x, int y, prog_uint16_t *bitmap, uint8_t w, uint8_t h, uint8_t color)
