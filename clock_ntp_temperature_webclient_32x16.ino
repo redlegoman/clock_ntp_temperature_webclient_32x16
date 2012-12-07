@@ -14,10 +14,15 @@
 byte mac[] = { 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF }; 
 
 /* ******** NTP Server Settings ******** */
-IPAddress timeServer(10,10,10,150);
+//IPAddress timeServer(10,10,10,150);
+//193.79.237.14
+IPAddress timeServer(193,79,237,14);
 /* Set this to the offset (in seconds) to your local time
    This example is GMT - 6 */
-const long timeZoneOffset = -00L;  
+//const long timeZoneOffset = -00L;  
+//add 2 seconds to time, because there always seems to be a 2seconds difference after ntp sync
+const long timeZoneOffset = 2;  
+
 //sync NTP every ntpSyncTime seconds
 unsigned int ntpSyncTime = 3600;       
 // sync temperature from web site every tempSyncTIme seconds
@@ -67,6 +72,7 @@ void setup() {
 //  delay (5000);
 
   //for(;;);
+  
   ledMatrix.clear();
   ledMatrix.pwm(15);
   ledMatrix.setfont(FONT_7x14B);
@@ -114,11 +120,14 @@ void setup() {
   if(trys<10){
     ntpUpdated=1;
     Serial.println("setup :ntp server update success");
-    ledMatrix.hscrolltext(0,"ntp success ",GREEN, 5, 1, LEFT);
+//    ledMatrix.hscrolltext(0,"ntp success ",GREEN, 5, 1, LEFT);
   }else{
     ntpUpdated=0;
     Serial.println("setup:ntp server update failed");
     ledMatrix.hscrolltext(0,"ntp server update failed ",RED, 10, 1, LEFT);
+    // here, get time from the RTC instead, then stop checking for NTP unless the network is available again 
+    // (ping timeserver?)    
+    
   }
   ledMatrix.clear();
   ledMatrix.pwm(15);
@@ -217,7 +226,7 @@ void loop() {
   seconds=secs;
  
   currentTime();
-  setStyle(dispHour24, dispMinute); // set color and brightness based on displayed time
+  setStyle(dispHour12, dispMinute); // set color and brightness based on displayed time
   drawScreen(dispHour12, dispMinute, dispPM); // draw the screen             
   delay(100); // wait for 100ms
       
@@ -247,14 +256,14 @@ void currentTime () {
 void setStyle(int hour24, int minute) {
       
         // adjust the brightness based on the time of day
-        if (hour24 <= 5) ledMatrix.pwm(1); /// 1 12:00a to 5:59a minimum brightness
+        if (hour24 <= 5) ledMatrix.pwm(0); /// 1 12:00a to 5:59a minimum brightness
         else if (hour24 <= 6) ledMatrix.pwm(5); //5 6:00a to 6:59a brighter
         else if (hour24 <= 19) ledMatrix.pwm(15); //15 7:00a to 7:59p max brightness
         else if (hour24 <= 21) ledMatrix.pwm(5); //5 8:00p to 9:59p dimmer
-        else if (hour24 <= 24) ledMatrix.pwm(1); //1  10:00p to 11:59p minimum brightness
+        else if (hour24 <= 24) ledMatrix.pwm(1); //1  10:00p to 11:59p minimum +1 brightness
         
         // adjust the color based on the time of day
-        if (hour24 <= 6) digit_color = GREEN; // 12:00a to 6:59a red digits
+        if (hour24 <= 6) digit_color = RED; // 12:00a to 6:59a red digits
         else if (hour24 <= 19) digit_color = GREEN; // 7:00a to 7:59p green digits 
         else if (hour24 <= 24) digit_color = RED; // 8:00p to 11:59p red digits
         
@@ -325,12 +334,15 @@ void drawScreen( int hour12, int minute, int pm){
 //        Serial.print("len3 = ");
  //       Serial.println(len3);
         ledMatrix.setfont(FONT_5x7);
+        const String blank = " ";
         if(len3 == 4){
           ledMatrix.putchar2(0,10,pageValue[0],ORANGE);
           ledMatrix.setfont(FONT_4x6);
           ledMatrix.putchar2(4,11,pageValue[1],ORANGE);
           ledMatrix.setfont(FONT_5x7);
           ledMatrix.putchar2(7,10,pageValue[2],ORANGE);
+          ledMatrix.putchar2(11,10,blank[0],ORANGE);
+ 
         }else{
           ledMatrix.putchar2(0,10,pageValue[0],ORANGE);
           ledMatrix.putchar2(5,10,pageValue[1],ORANGE);
