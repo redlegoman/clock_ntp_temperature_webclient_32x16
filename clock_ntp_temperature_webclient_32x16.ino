@@ -165,7 +165,7 @@ unsigned long sendNTPpacket(IPAddress& address)
 
 
 //=========================================================================================================
-boolean touchActive = false;
+//boolean touchActive = false;
 char dig[6]  = "01234";
 char msg[10] = "012345678";
     
@@ -180,7 +180,6 @@ int dispMinute = 0;
 int dispPM = 0;
 // initialize colors    
 int digit_color = GREEN;
-int message_color = RED;
 int ampm_color = GREEN;
 // initialize array to hold [x, y, prior_x, prior_y] data for touch location
 int dot[4] = {0,0,0,0}; 
@@ -219,7 +218,7 @@ void loop() {
  
   currentTime();
   setStyle(dispHour24, dispMinute); // set color and brightness based on displayed time
-  drawScreen(dispHour12, dispMinute, dispPM, touchActive, msg); // draw the screen             
+  drawScreen(dispHour12, dispMinute, dispPM); // draw the screen             
   delay(100); // wait for 100ms
       
 }//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -259,12 +258,7 @@ void setStyle(int hour24, int minute) {
         else if (hour24 <= 19) digit_color = GREEN; // 7:00a to 7:59p green digits 
         else if (hour24 <= 24) digit_color = RED; // 8:00p to 11:59p red digits
         
-        // set am/pm color .. this should probably = digit_color if there is an alarm display active in message area
-        //ampm_color = digit_color;
         ampm_color = ORANGE;
-        
-        if (digit_color == GREEN) message_color = RED;
-        if (digit_color == RED) message_color = GREEN;
 
         // adjust the boldness based on the time of day. normal font = less pixels lit = darker for sleeping
         if (hour24 <= 5) ledMatrix.setfont(FONT_7x14B); // 12:00a to 5:59a use a 7x14 normal font
@@ -273,20 +267,19 @@ void setStyle(int hour24, int minute) {
 
     }
 
-void drawScreen( int hour12, int minute, int pm, boolean msgState, char message[10]){    
+//void drawScreen( int hour12, int minute, int pm, boolean msgState, char message[10]){    
+void drawScreen( int hour12, int minute, int pm){    
         
         char buf[5];
         char ampm = 'A';
         char letter_m = 'M';
-
-
         
         dig[0] = '1'; // set flag for valid time
         
         // set the hours digits
         itoa(hour12, buf, 10);
         if (hour12 < 10){
-          dig[1] = '\0';
+          dig[1] = ' ';
           dig[2] = buf[0];
         }
         else{
@@ -311,16 +304,6 @@ void drawScreen( int hour12, int minute, int pm, boolean msgState, char message[
         msg[7] = ampm;
         msg[8] = letter_m;                       
       
-        // clear any prior touch dots
-        //ledMatrix.plot(dot[2],dot[3],BLACK); // clear any prior touch dots
-        
-        // clear the message area        
-        ledMatrix.rect(0,11,22,15,BLACK);
-        ledMatrix.rect(1,10,21,14,BLACK);
-        ledMatrix.rect(2,9,20,13,BLACK);
-        ledMatrix.rect(3,8,19,12,BLACK);
-        
-//        ledMatrix.setfont(FONT_7x14B);
         
         ledMatrix.putchar(2,-2,dig[1],digit_color,6); // first digit of hour
         ledMatrix.putchar(9,-2,dig[2],digit_color,6); // second digit of hour

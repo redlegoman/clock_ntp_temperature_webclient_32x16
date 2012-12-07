@@ -4,7 +4,7 @@
 #include "./ht1632c_C.h"
 #include "Print.h"
 #include "./font_b.h"
-#include "./font_koi8.h"
+//#include "./font_koi8.h"
 
 /* fast integer (1 uint8_t) modulus - returns n % d */
 
@@ -260,7 +260,7 @@ void ht1632c::_setup(uint8_t number)
   fb_size = 16 * cs_max;
   g_fb = (uint8_t*) malloc(fb_size);
   r_fb = (uint8_t*) malloc(fb_size);
-  setfont(FONT_5x7W);
+//  setfont(FONT_5x7W);
   x_cur = 0;
   y_cur = 0;
 
