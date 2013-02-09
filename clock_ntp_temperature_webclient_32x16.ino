@@ -5,9 +5,20 @@
 #include <Ethernet.h>
 #include <EthernetUdp.h>
 #include <Time.h>
+#include <DS1302.h>
 
 #include <DateTime.h>
 #include <DateTimeStrings.h>
+
+/* ******** RTC connection ******* */
+//-- RTC DS1302
+uint8_t CE_PIN   = 8; // RTC
+uint8_t IO_PIN   = 9; // RTC
+uint8_t SCLK_PIN = 10;// RTC
+/* Create a DS1302 object */
+DS1302 rtc(CE_PIN, IO_PIN, SCLK_PIN);
+Time t;
+//time_t ti;
 
 /* ******** Ethernet Card Settings ******** */
 // Set this to your Ethernet Card Mac Address
@@ -16,7 +27,7 @@ byte mac[] = { 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
 /* ******** NTP Server Settings ******** */
 //IPAddress timeServer(10,10,10,150);
 //193.79.237.14
-IPAddress timeServer(193,79,237,14);
+IPAddress timeServer(10,10,10,4);
 /* Set this to the offset (in seconds) to your local time
    This example is GMT - 6 */
 //const long timeZoneOffset = -00L;  
@@ -69,6 +80,8 @@ boolean startRead = false; // is reading?
 
 void setup() {
   Serial.begin(9600);
+  t = rtc.time();
+//  ti = rtc.time();
 //  delay (5000);
 
   //for(;;);
@@ -137,6 +150,7 @@ void setup() {
 
 // Do not alter this function, it is used by the system
 int getTimeAndDate() {
+  Serial.println("getting time...");
    int flag=0;
    Udp.begin(localPort);
    sendNTPpacket(timeServer);
@@ -150,7 +164,10 @@ int getTimeAndDate() {
      epoch = epoch - 2208988800 + timeZoneOffset;
      flag=1;
      setTime(epoch);
+//     setTime(t);
      ntpLastUpdate = now();
+//     Serial.print("epoch="); Serial.println(epoch);
+     //Serial.print("t="); Serial.println(t);
    }
    return flag;
 }
@@ -193,9 +210,104 @@ int ampm_color = GREEN;
 // initialize array to hold [x, y, prior_x, prior_y] data for touch location
 int dot[4] = {0,0,0,0}; 
 String pageValue = "00.00";
+
+char buf[50];
+char today[10];
+char mon[10];
+String RTCTime = "00:00";
+String RTCDay = "NoSetDay";
+
 //===================================================== LOOP ==============================================
 
 void loop() {
+  
+  
+//  memset(today, 0, sizeof(today));  /* clear day buffer */
+    switch (t.day) {
+    case 1:
+      strcpy(today, "Sunday");
+      break;
+    case 2:
+      strcpy(today, "Monday");
+      break;
+    case 3:
+      strcpy(today, "Tuesday");
+      break;
+    case 4:
+      strcpy(today, "Wednesday");
+      break;
+    case 5:
+      strcpy(today, "Thursday");
+      break;
+    case 6:
+      strcpy(today, "Friday");
+      break;
+    case 7:
+      strcpy(today, "Saturday");
+      break;
+  }
+  switch (t.mon) {
+    case 1:
+      strcpy(mon, "January");
+      break;
+    case 2:
+      strcpy(mon, "February");
+      break;
+    case 3:
+      strcpy(mon, "March");
+      break;
+    case 4:
+      strcpy(mon, "April");
+      break;
+    case 5:
+      strcpy(mon, "May");
+      break;
+    case 6:
+      strcpy(mon, "June");
+      break;
+    case 7:
+      strcpy(mon, "July");
+      break;
+    case 8:
+      strcpy(mon,"August");
+      break;
+    case 9:
+      strcpy(mon,"September");
+      break;
+    case 10:
+      strcpy(mon,"October");
+      break;
+    case 11:
+      strcpy(mon,"November");
+      break;
+    case 12:
+      strcpy(mon,"December");
+      break;  
+  }
+    char suffix[3] = "th";
+  switch (t.date) {
+    case 1: 
+    case 21:
+    case 31:
+      strcpy(suffix,"st"); break;
+    case 2: 
+    case 22:
+      strcpy(suffix,"nd"); break;
+    case 3: 
+    case 23:
+      strcpy(suffix,"rd"); break;
+  }
+  
+  /*
+  snprintf(buf,sizeof(buf), "%02d:%02d", t.hr, t.min);
+  RTCTime=buf;
+  snprintf(buf,sizeof(buf), "%s %2d%s %s %04d", today, t.date, suffix, mon, t.yr);
+  RTCDay=buf;
+  */
+  
+//  Serial.println(RTCTime);
+  
+  
   // if there are incoming bytes available 
   // from the server, read them and print them:  
 
